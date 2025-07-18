@@ -1,0 +1,357 @@
+{
+  "name": "ai short clipper",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "YouTube Video Clipper",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "YouTube Video Url",
+              "placeholder": "https://www.youtube.com/watch?v=DB9mjd-65gw",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        340
+      ],
+      "id": "68204250-9487-444e-8dac-f0386595ac53",
+      "name": "form_trigger",
+      "webhookId": "b624408a-188f-4fc0-abf3-20293eba7b98"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elb-api.vizard.ai/hvizard-server-front/open-api/v1/project/create",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lang\": \"en\",\n  \"preferLength\": [\n    0\n  ],\n  \"videoUrl\": \"{{ $json['YouTube Video Url'] }}\",\n  \"videoType\": 2,\n  \"maxClipNumber\": 8\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        360,
+        260
+      ],
+      "id": "89e8095a-3492-4ecd-8b87-9cf092c6c4f4",
+      "name": "submit_video"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        100
+      ],
+      "id": "92b1cd0c-bd34-4187-af32-a21a675bb3c8",
+      "name": "wait",
+      "webhookId": "65cefde9-1d9f-466c-9b9e-b200eb155023"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0583b406-8a93-4582-9229-7f68aa461320",
+              "leftValue": "={{ $json.code }}",
+              "rightValue": 2000,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        300
+      ],
+      "id": "c042d094-087e-4915-9218-247446854e5d",
+      "name": "check_status"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C08KC39K8DR",
+          "mode": "list",
+          "cachedResultName": "ai-tools-content"
+        },
+        "text": "=<{{ $('form_trigger').item.json['YouTube Video Url'] }}|Video Clipper Results>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        560
+      ],
+      "id": "a0796713-e084-4609-86de-f38066550f76",
+      "name": "send_initial_msg",
+      "webhookId": "92c0d4b5-b4de-409a-ad16-15648a4a6978"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dd18de51-6e46-48a5-8df6-3fbb6b03474b",
+              "name": "videos",
+              "value": "={{ $('check_status').item.json.videos }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        560
+      ],
+      "id": "b505697d-0807-4ba6-aee0-04a27b543beb",
+      "name": "set_videos"
+    },
+    {
+      "parameters": {
+        "url": "=https://elb-api.vizard.ai/hvizard-server-front/open-api/v1/project/query/{{ $json.projectId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        180
+      ],
+      "id": "1a9f73b1-2137-4d16-a334-f19163a370bb",
+      "name": "get_clipping_status"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "videos",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        560,
+        560
+      ],
+      "id": "7cd53786-cae4-484d-ae98-4445da7fd64a",
+      "name": "split_videos"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C08KC39K8DR",
+          "mode": "list",
+          "cachedResultName": "ai-tools-content"
+        },
+        "text": "=*{{ $json.title }} | ({{ $json.viralScore }} / 10)*\n```\n{{ $json.videoUrl }}\n```\n---",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('send_initial_msg').item.json.message.ts }}"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        560
+      ],
+      "id": "7018ca0b-ada0-4eef-b369-0d254cafa934",
+      "name": "send_video_msg",
+      "webhookId": "92c0d4b5-b4de-409a-ad16-15648a4a6978"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1ca8f8e1-04f4-44fd-9a2d-7e656b08ff81",
+              "leftValue": "={{ $json.viralScore }}",
+              "rightValue": 9,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        840,
+        560
+      ],
+      "id": "56175458-def8-4917-84e1-930f79cdfc3a",
+      "name": "filter_viral_score"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "form_trigger": {
+      "main": [
+        [
+          {
+            "node": "submit_video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit_video": {
+      "main": [
+        [
+          {
+            "node": "wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait": {
+      "main": [
+        [
+          {
+            "node": "get_clipping_status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_status": {
+      "main": [
+        [
+          {
+            "node": "send_initial_msg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_initial_msg": {
+      "main": [
+        [
+          {
+            "node": "set_videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_clipping_status": {
+      "main": [
+        [
+          {
+            "node": "check_status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_videos": {
+      "main": [
+        [
+          {
+            "node": "split_videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split_videos": {
+      "main": [
+        [
+          {
+            "node": "filter_viral_score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter_viral_score": {
+      "main": [
+        [
+          {
+            "node": "send_video_msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a3f42c06-d2be-4acf-9bff-d9ccae4cdd44",
+  "meta": {
+    "instanceId": "8f3a64a9b0ac9c1732ad4c6d982a12327da89ae8db6bd18b01517a504f401725"
+  },
+  "id": "pinjYeS6BNGWEtVU",
+  "tags": []
+}
